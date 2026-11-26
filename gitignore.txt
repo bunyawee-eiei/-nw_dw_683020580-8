@@ -15,4 +15,5 @@ dbt_packages/
 # Python / OS
 _pycache_/
 *.pyc
-.DS_Store
+.DS_Store*.duckdb
+*.duckdb.wal
