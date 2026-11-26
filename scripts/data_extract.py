@@ -3,9 +3,21 @@ from pathlib import Path
 import duckdb
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIR = PROJECT_ROOT / "data" / "raw"
-DATABASE_PATH = PROJECT_ROOT / "northwind.duckdb"
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / "data"
+DB_PATH = ROOT / "northwind.duckdb"
+
+SOURCES = {
+    "customer": "raw/customer.csv",
+    "employees": "raw/employees.csv",
+    "order_details": "raw/order_details.csv",
+    "orders": "raw/orders.csv",
+    "products": "raw/products.csv",
+    "shippers": "raw/shippers.csv",
+    "suppliers": "raw/suppliers.csv",
+    "legacy_orders": "legacy/orders.csv",
+    "legacy_order_details": "legacy/order_details.csv",
+}
 
 
 def quote_identifier(identifier: str) -> str:
@@ -13,52 +25,32 @@ def quote_identifier(identifier: str) -> str:
     return f'"{escaped_identifier}"'
 
 
-def get_source_files(source_dir: Path) -> list[Path]:
-    if not source_dir.is_dir():
-        raise FileNotFoundError(f"Source directory does not exist: {source_dir}")
-
-    csv_files = sorted(source_dir.glob("*.csv"))
-    if not csv_files:
-        raise FileNotFoundError(f"No CSV files found in source directory: {source_dir}")
-
-    return csv_files
-
-
-def load_csv_files(connection: duckdb.DuckDBPyConnection, csv_files: list[Path]) -> int:
-    loaded_count = 0
-
-    for csv_file in csv_files:
-        table_name = csv_file.stem
-        quoted_table_name = quote_identifier(table_name)
-
-        connection.execute(
-            f"CREATE OR REPLACE TABLE {quoted_table_name} AS "
-            "SELECT * FROM read_csv_auto(?)",
-            [str(csv_file)],
-        )
-
-        row_count = connection.execute(
-            f"SELECT COUNT(*) FROM {quoted_table_name}"
-        ).fetchone()[0]
-        print(
-            f"Loaded {csv_file.relative_to(PROJECT_ROOT)} "
-            f"into table {table_name} ({row_count} rows)"
-        )
-        loaded_count += 1
-
-    return loaded_count
-
-
 def main() -> None:
-    csv_files = get_source_files(SOURCE_DIR)
-    connection = duckdb.connect(str(DATABASE_PATH))
+    connection = duckdb.connect(str(DB_PATH))
 
     try:
-        loaded_count = load_csv_files(connection, csv_files)
+        connection.execute("CREATE SCHEMA IF NOT EXISTS raw")
+        print(f"Loading source data into {DB_PATH.name}")
+
+        for table_name, relative_path in SOURCES.items():
+            csv_path = DATA_DIR / relative_path
+            if not csv_path.is_file():
+                raise FileNotFoundError(f"Source file not found: {csv_path}")
+
+            table = f"raw.{quote_identifier(table_name)}"
+            connection.execute(
+                f"CREATE OR REPLACE TABLE {table} AS "
+                "SELECT * FROM read_csv_auto(?)",
+                [str(csv_path)],
+            )
+            row_count = connection.execute(
+                f"SELECT COUNT(*) FROM {table}"
+            ).fetchone()[0]
+            print(f"raw.{table_name:<22} {row_count:>6,} rows")
     finally:
         connection.close()
 
-    print(f"Finished loading {loaded_count} CSV file(s) into {DATABASE_PATH.name}")
+    print("Finished loading all source files.")
 
 
 if __name__ == "__main__":
