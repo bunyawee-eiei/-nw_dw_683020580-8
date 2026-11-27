@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: customer
+      - name: employees
+      - name: products
+      - name: orders
+      - name: order_details
+      - name: shippers
+      - name: suppliers
