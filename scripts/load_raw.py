@@ -1,31 +1,33 @@
+from pathlib import Path
 import duckdb
-import glob
-import os
 
-# --- แก้ไขแค่ตรง SOURCE_DIR หากเปลี่ยนที่เก็บไฟล์ ---
-SOURCE_DIR = "data/raw"
-DB_PATH = "northwind.duckdb"
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / "data"
+DB_PATH = ROOT / "northwind.duckdb"
+
+SOURCES = {
+    "customer": "raw/customer.csv",
+    "employees": "raw/employees.csv",
+    "suppliers": "raw/suppliers.csv",
+    "shippers": "raw/shippers.csv",
+    "products": "raw/products.csv",
+    "orders": "raw/orders.csv",
+    "order_details": "raw/order_details.csv",
+    "legacy_orders": "legacy/orders.csv",
+    "legacy_order_details": "legacy/order_details.csv",
+}
 
 def main():
-    con = duckdb.connect(DB_PATH)
+    print(f"Loading data {DB_PATH.name}")
+    con = duckdb.connect(str(DB_PATH))
     con.execute("CREATE SCHEMA IF NOT EXISTS raw;")
-    
-    csv_files = sorted(glob.glob(os.path.join(SOURCE_DIR, "*.csv")))
-    if not csv_files:
-        print(f"ไม่พบไฟล์ .csv ใน {SOURCE_DIR}")
-        return
-
-    for file_path in csv_files:
-        table_name = os.path.splitext(os.path.basename(file_path))[0]
-        # สร้างตารางใน schema raw (และสร้างใน main ด้วยเผื่ออาจารย์ query แบบไม่ใส่ชื่อ schema)
-        con.execute(f"CREATE OR REPLACE TABLE raw.{table_name} AS SELECT * FROM read_csv_auto('{file_path}');")
-        con.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM read_csv_auto('{file_path}');")
-        
-        count = con.execute(f"SELECT COUNT(*) FROM raw.{table_name}").fetchone()[0]
-        print(f"Extracted '{file_path}' -> table 'raw.{table_name}' ({count} rows)")
-
+    for table_name, rel_path in SOURCES.items():
+        file_path = DATA_DIR / rel_path
+        con.execute(f"CREATE OR REPLACE TABLE raw.{table_name} AS SELECT * FROM read_csv_auto('{file_path.as_posix()}');")
+        row_count = con.execute(f"SELECT COUNT(*) FROM raw.{table_name}").fetchone()[0]
+        print(f"  raw.{table_name:<22} {row_count:>6,} แถว")
     con.close()
-    print("Extract raw data into DuckDB Data Warehouse complete!")
+    print("Loading raw data have done.")
 
 if __name__ == "__main__":
     main()

@@ -1,14 +1,24 @@
+import sys
 import duckdb
+from pathlib import Path
 
-DB_PATH = "northwind.duckdb"
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "northwind.duckdb"
 
 def main():
-    con = duckdb.connect(DB_PATH)
-    tables = con.execute("SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema IN ('main', 'raw') ORDER BY table_schema, table_name;").fetchall()
-    print("Tables in DuckDB Data Warehouse:")
-    for schema, name in tables:
-        count = con.execute(f"SELECT COUNT(*) FROM {schema}.{name}").fetchone()[0]
-        print(f" - {schema}.{name}: {count} rows")
+    if len(sys.argv) < 2:
+        print('Usage: python scripts/query.py "<SQL_QUERY>"')
+        return
+    
+    sql = sys.argv[1]
+    con = duckdb.connect(str(DB_PATH))
+    result = con.execute(sql).fetchall()
+    cols = [desc[0] for desc in con.description]
+    
+    print(" | ".join(cols))
+    print("-" * 50)
+    for row in result:
+        print(" | ".join(str(val) for val in row))
     con.close()
 
 if __name__ == "__main__":
