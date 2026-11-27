@@ -2,8 +2,9 @@
 .venv/
 venv/
 
-# ไฟล์ฐานข้อมูล DUCKDB - สร้างใหม่ได้จาก pipeline จึงไม่เก็บใน Git
+# Keep the project database in Git; ignore only DuckDB temporary files.
 *.duckdb
+!northwind.duckdb
 *.duckddb.wal
 
 # สิ่งที่ dbt สร้างขึ้นเอง
